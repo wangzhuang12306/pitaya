@@ -28,7 +28,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--name', help='pod name', required=True)
     parser.add_argument('--port', help='pod manager port', required=True)
-    parser.add_argument('--ip', help='pod manager ip', default='127.0.0.1')
+    parser.add_argument('--ip', help='pod manager ip', default='0.0.0.0')
     parser.add_argument('--timeout', type=int, help='seconds to run')
     parser.add_argument('command', nargs='+')
     args = parser.parse_args()
@@ -39,7 +39,7 @@ def main():
     client_env['POD_MANAGER_IP'] = args.ip
     client_env['POD_MANAGER_PORT'] = args.port
     client_env['POD_NAME'] = args.name
-    client_env['LD_PRELOAD'] = "{}/gemini/lib/libgemhook.so.1".format(Path.home())
+    client_env['LD_PRELOAD'] = "{}/pitaya/lib/libgemhook.so.1".format(Path.home())
 
     proc = sp.Popen(
         args.command, env=client_env, start_new_session=True, universal_newlines=True, bufsize=1

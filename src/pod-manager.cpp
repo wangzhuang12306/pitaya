@@ -40,7 +40,7 @@
 #include <functional>
 #include <map>
 #include <queue>
-
+#include <string>
 #include "comm.h"
 #include "debug.h"
 #include "util.h"
@@ -49,10 +49,11 @@ using std::chrono::duration_cast;
 using std::chrono::microseconds;
 using std::chrono::steady_clock;
 using std::chrono::time_point;
-
+using std::string;
 // connection information, below are default values
 // can be changed by environment vairables
-char SCHEDULER_IP[20] = "127.0.0.1";
+//char SCHEDULER_IP[20] = "127.0.0.1";
+char SCHEDULER_IP[20] = "219.245.186.38";
 uint16_t SCHEDULER_PORT = 50051;
 uint16_t POD_SERVER_PORT = 50052;
 
@@ -140,6 +141,9 @@ int retrieve_mem_info(int sockfd, const int MAX_RETRY, const long RETRY_TIMEOUT)
   return 0;
 }
 
+
+
+
 int main(int argc, char *argv[]) {
   const int NET_OP_MAX_ATTEMPT = 5;  // maximum time retrying failed network operations
   const int NET_OP_RETRY_INTV = 10;  // seconds between two retries
@@ -150,11 +154,14 @@ int main(int argc, char *argv[]) {
 
   // use host name as Pod name
   char *name = getenv("POD_NAME");
+  INFO("POD_Name_early:",*name);
+
   if (name != NULL) {
     strcpy(pod_name, name);
   } else {
     gethostname(pod_name, HOST_NAME_MAX);
   }
+  INFO("POD_Name_later:",pod_name);
   pod_name_len = strlen(pod_name);
 
   /* get connection information from environment variable */
@@ -179,6 +186,8 @@ int main(int argc, char *argv[]) {
   /* establish connection with scheduler */
   // create socket
   int schd_sockfd = socket(PF_INET, SOCK_STREAM, 0);
+  INFO("schd_sockfd:", schd_sockfd);
+
   if (schd_sockfd == -1) {
     int err = errno;
     ERROR("failed to create socket: %s", strerror(err));
@@ -191,6 +200,7 @@ int main(int argc, char *argv[]) {
   schd_info.sin_family = AF_INET;
   schd_info.sin_addr.s_addr = inet_addr(SCHEDULER_IP);
   schd_info.sin_port = htons(SCHEDULER_PORT);
+  INFO("schd_info:", schd_info);
 
   // connect to scheduler
   rc = multiple_attempt(
@@ -267,6 +277,15 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
+
+
+
+
+
+
+
+
+
 
 void sig_handler(int sig) {
   void *arr[10];

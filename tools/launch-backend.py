@@ -26,7 +26,7 @@ def prepare_env(idx, name, ip, port, schd_port):
     client_env = os.environ.copy()
     client_env['SCHEDULER_IP'] = ip
     client_env['SCHEDULER_PORT'] = str(schd_port)
-    client_env['POD_MANAGER_IP'] = ip
+    client_env['POD_MANAGER_IP'] = "172.17.0.4"
     client_env['POD_MANAGER_PORT'] = str(port)
     client_env['POD_NAME'] = name
     return client_env
@@ -40,7 +40,9 @@ def launch_scheduler(args):
     cmd = "{} -p {} -f {} -P {} -q {} -m {} -w {}".format(
         args.schd, cfg_h, cfg_t, args.port, args.base_quota, args.min_quota, args.window
     )
+    print("cmd:"+cmd)
     proc = sp.Popen(shlex.split(cmd), universal_newlines=True, bufsize=1)
+    print("proc:" + str(proc))
     return proc
 
 
@@ -49,19 +51,20 @@ def main():
     parser.add_argument('schd', help='path to scheduler executable')
     parser.add_argument('pmgr', help='path to pod-manager executable')
     parser.add_argument('--ip', default='219.245.186.38', help='IP of scheduling system runs on')
-    parser.add_argument('--port', type=int, default=30100, help='base port')
+    parser.add_argument('--port', type=int, default=50051, help='base port')
     parser.add_argument('--config', default='resource-config.txt', help='resource config file')
     parser.add_argument('--base_quota', type=float, default=300, help='base quota (ms)')
     parser.add_argument('--min_quota', type=float, default=20, help='minimum quota (ms)')
     parser.add_argument('--window', type=float, default=10000, help='time window (ms)')
     args = parser.parse_args()
+    print("args:"+str(args))
 
     with open(args.config) as f:
         lines = f.read().splitlines()
-
+        print("lines:" + str(lines))
     n = int(lines[0])  # clients
+    print("n:"+str(n))
     childs = []
-
     schd_proc = launch_scheduler(args)
     childs.append((0, schd_proc))
     print(f"[launcher] scheduler started on {args.ip}:{args.port}")

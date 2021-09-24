@@ -72,7 +72,7 @@ struct valid_candidate_t {
   double remaining;  // limit - usage
   double usage;
   double arrived_time;
-  int priority; //0：high_priority ; 1:low_priority
+//  int priority; //0：high_priority ; 1:low_priority
   std::list<candidate_t>::iterator iter;
 };
 

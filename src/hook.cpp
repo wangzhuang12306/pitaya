@@ -145,7 +145,8 @@ void *dlsym(void *handle, const char *symbol) {
 }
 
 /* connection with Pod manager */
-char pod_manager_ip[20] = "127.0.0.1";
+//char pod_manager_ip[20] = "127.0.0.1";
+char pod_manager_ip[20] = "219.245.186.38";
 uint16_t pod_manager_port = 50052;                       // default value
 pthread_mutex_t comm_mutex = PTHREAD_MUTEX_INITIALIZER;  // one communication at a time
 const int NET_OP_MAX_ATTEMPT = 5;  // maximum time retrying failed network operations

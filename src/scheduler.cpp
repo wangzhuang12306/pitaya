@@ -180,7 +180,9 @@ std::list<candidate_t> candidates;  //候选列表
 pthread_mutex_t candidate_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t candidate_cond;  // initialized with CLOCK_MONOTONIC in main()
 
-void read_resource_config() {  //读取资源配置文件
+
+//读取资源配置文件,并创建client_inf存储配置文件中的各个容器配置
+void read_resource_config() {
   std::fstream fin;
   ClientInfo *client_inf;
   char client_name[HOST_NAME_MAX], full_path[PATH_MAX]; //容器名称、完整路径
@@ -277,7 +279,7 @@ candidate_t select_candidate() {
     double window_size = WINDOW_SIZE; //滑动窗口大小
     int overlap_cnt = 0, i, j, k;
     std::map<string, double> usage;
-    struct container_timestamp {  //容器时间戳
+    struct container_timestamp {  //定义容器时间戳结构体
       string name;
       double time;
     };
@@ -367,7 +369,7 @@ candidate_t select_candidate() {
     }
 
     /* select the one to execute */
-    std::vector<valid_candidate_t> vaild_candidates;
+    std::vector<valid_candidate_t> vaild_candidates;  //创建vector类vaild_candidates，用于放置使用率不超过limit的容器
 
     for (auto it = candidates.begin(); it != candidates.end(); it++) {
       string name = it->name;
@@ -378,8 +380,9 @@ candidate_t select_candidate() {
       remaining = limit - usage[name];
       if (remaining > 0)
         vaild_candidates.push_back({missing, remaining, usage[it->name], it->arrived_time, it});
-    }
+    }//将gpu使用率没有超过其limit的容器加入vaild_candidates中
 
+    //若所有的容器使用率都超过了limit，则沉睡直到新的请求到来
     if (vaild_candidates.size() == 0) {
       // all candidates reach usage limit
       auto ts = get_timespec_after(history_list.begin()->end - window_start);
@@ -389,11 +392,11 @@ candidate_t select_candidate() {
       continue;  // go to begin of loop
     }
 
-    std::sort(vaild_candidates.begin(), vaild_candidates.end(), schd_priority);
+    std::sort(vaild_candidates.begin(), vaild_candidates.end(), schd_priority); //根据调度策略将候选容器排序，vector最前端的容器会优先调度令牌
 
     auto selected_iter = vaild_candidates.begin()->iter;
-    candidate_t result = *selected_iter;
-    candidates.erase(selected_iter);
+    candidate_t result = *selected_iter;//返回排序后的候选列表中的第一个容器并给其调度令牌
+    candidates.erase(selected_iter); //将该容器从候选容器列表中删除
     return result;
   }
 }
@@ -413,8 +416,14 @@ void handle_message(int client_sock, char *message) {
     return;
   }
   client_inf = client_info_map[string(client_name)];
+  INFO("*message:",*message);
+  INFO("client_sock:",client_sock);
+  INFO("client_inf:",client_inf);
   bzero(sbuf, RSP_MSG_LEN);
-
+  INFO("REQ_QUOTA:",REQ_QUOTA);
+  INFO("REQ_MEM_LIMI:",REQ_MEM_LIMIT);
+  INFO("REQ_MEM_UPDATE:",REQ_MEM_UPDATE);
+  INFO("req:",req);
   if (req == REQ_QUOTA) {
     double overuse, burst, window;
     overuse = get_msg_data<double>(attached, offset);
@@ -454,19 +463,19 @@ void *schedule_daemon_func(void *) {
     pthread_mutex_lock(&candidate_mutex);
     if (candidates.size() != 0) {
       // remove an entry from candidates
-      candidate_t selected = select_candidate();
+      candidate_t selected = select_candidate();  //调用函数得到该容器，并返回给该容器令牌
       DEBUG("select %s, waiting time: %.3f ms", selected.name.c_str(),
             ms_since_start() - selected.arrived_time);
 
-      quota = client_info_map[selected.name]->get_quota();
+      quota = client_info_map[selected.name]->get_quota(); //调用get_quota()函数，获取返回给该容器的时间配额
 #ifdef RANDOM_QUOTA
       quota *= dis(gen);
 #endif
-      client_info_map[selected.name]->Record(quota);
+      client_info_map[selected.name]->Record(quota); //记录时间配额
 
-      pthread_mutex_unlock(&candidate_mutex);
+      pthread_mutex_unlock(&candidate_mutex); //互斥锁解锁
 
-      // send quota to selected instance
+      // send quota to selected instance 将时间配额发送给选中的容器
       char sbuf[RSP_MSG_LEN];
       bzero(sbuf, RSP_MSG_LEN);
       prepare_response(sbuf, REQ_QUOTA, selected.req_id, quota);
@@ -476,9 +485,9 @@ void *schedule_daemon_func(void *) {
 
       // wait until the selected one's quota time out
       bool should_wait = true;
-      pthread_mutex_lock(&candidate_mutex);
+      pthread_mutex_lock(&candidate_mutex);  //互斥锁上锁
       while (should_wait) {
-        int rc = pthread_cond_timedwait(&candidate_cond, &candidate_mutex, &ts);
+        int rc = pthread_cond_timedwait(&candidate_cond, &candidate_mutex, &ts); //等待条件变量，挂起线程，会有timeout时间，如果到了timeout,线程自动解除阻塞
         if (rc == ETIMEDOUT) {
           DEBUG("%s didn't return on time", selected.name.c_str());
           should_wait = false;
@@ -492,9 +501,9 @@ void *schedule_daemon_func(void *) {
           }
         }
       }
-      pthread_mutex_unlock(&candidate_mutex);
+      pthread_mutex_unlock(&candidate_mutex); //互斥锁解锁
     } else {
-      // wait for incoming connections
+      // wait for incoming connections 等待队列中无容器请求，等待请求到来
       DEBUG("no candidates");
       pthread_cond_wait(&candidate_cond, &candidate_mutex);
       pthread_mutex_unlock(&candidate_mutex);
@@ -508,6 +517,8 @@ void *pod_client_func(void *args) {
   char *rbuf = new char[REQ_MSG_LEN];
   ssize_t recv_rc;
   while ((recv_rc = recv(pod_sockfd, rbuf, REQ_MSG_LEN, 0)) > 0) {
+    INFO("pod_sockfd:",pod_sockfd);
+    INFO("rbuf:",rbuf);
     handle_message(pod_sockfd, rbuf);
   }
   DEBUG("Connection closed by Pod manager. recv() returns %ld.", recv_rc);
@@ -571,12 +582,12 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (verbosity > 0) {
-    printf("Scheduler settings:\n");
-    printf("    %-20s %.3f ms\n", "default quota:", QUOTA);
-    printf("    %-20s %.3f ms\n", "minimum quota:", MIN_QUOTA);
-    printf("    %-20s %.3f ms\n", "time window:", WINDOW_SIZE);
-  }
+//  if (verbosity > 0) {
+  printf("Scheduler settings:\n");
+  printf("    %-20s %.3f ms\n", "default quota:", QUOTA);
+  printf("    %-20s %.3f ms\n", "minimum quota:", MIN_QUOTA);
+  printf("    %-20s %.3f ms\n", "time window:", WINDOW_SIZE);
+//  }
 
   // register signal handler for debugging
   signal(SIGSEGV, sig_handler);
@@ -599,17 +610,19 @@ int main(int argc, char *argv[]) {
 
   sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd == -1) {
-    ERROR("Fail to create a socket!");
+    ERROR("Fail to create a socket!!");
     exit(-1);
   }
 
   struct sockaddr_in serverInfo;
   bzero(&serverInfo, sizeof(serverInfo));
-
+  INFO("sockfd1:",sockfd);
   serverInfo.sin_family = PF_INET;
   serverInfo.sin_addr.s_addr = INADDR_ANY;
   serverInfo.sin_port = htons(schd_port);
+  INFO("serverInfo1:",serverInfo);
   if (bind(sockfd, (struct sockaddr *)&serverInfo, sizeof(serverInfo)) < 0) {
+
     ERROR("cannot bind port");
     exit(-1);
   }
