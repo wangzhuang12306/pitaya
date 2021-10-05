@@ -26,7 +26,7 @@ def prepare_env(idx, name, ip, port, schd_port):
     client_env = os.environ.copy()
     client_env['SCHEDULER_IP'] = ip
     client_env['SCHEDULER_PORT'] = str(schd_port)
-    client_env['POD_MANAGER_IP'] = "172.17.0.4"
+    client_env['POD_MANAGER_IP'] = "0.0.0.0"
     client_env['POD_MANAGER_PORT'] = str(port)
     client_env['POD_NAME'] = name
     return client_env

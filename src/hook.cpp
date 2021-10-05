@@ -146,8 +146,8 @@ void *dlsym(void *handle, const char *symbol) {
 
 /* connection with Pod manager */
 //char pod_manager_ip[20] = "127.0.0.1";
-char pod_manager_ip[20] = "219.245.186.38";
-uint16_t pod_manager_port = 50052;                       // default value
+char pod_manager_ip[20] = "127.0.0.1";
+uint16_t pod_manager_port = 50051;                       // default value
 pthread_mutex_t comm_mutex = PTHREAD_MUTEX_INITIALIZER;  // one communication at a time
 const int NET_OP_MAX_ATTEMPT = 5;  // maximum time retrying failed network operations
 const int NET_OP_RETRY_INTV = 10;  // seconds between two retries
@@ -202,7 +202,7 @@ void configure_connection() {
   char *port = getenv("POD_MANAGER_PORT");
   if (port != NULL) pod_manager_port = atoi(port);
 
-  DEBUG("Pod manager: %s:%u", pod_manager_ip, pod_manager_port);
+  INFO("Pod manager: %s:%u", pod_manager_ip, pod_manager_port);
 }
 
 /**
@@ -351,7 +351,7 @@ double estimate_full_burst(double measured_burst, double measured_window) {
     if (measured_window < SCHD_OVERHEAD) full_burst *= 2;  // '2' can be changed to any value > 1
   }
 
-  DEBUG("measured burst: %.3f ms, window: %.3f ms, estimated full burst: %.3f ms", measured_burst,
+  INFO("measured burst: %.3f ms, window: %.3f ms, estimated full burst: %.3f ms", measured_burst,
         measured_window, full_burst);
 
   return full_burst;
@@ -412,7 +412,7 @@ void *wait_cuda_kernels(void *args) {
     // sleep until token expired or being notified
     pthread_mutex_lock(&overuse_trk_mutex);
     int rc = pthread_cond_timedwait(&overuse_trk_intr_cond, &overuse_trk_mutex, &ts);
-    if (rc != ETIMEDOUT) DEBUG("overuse tracking thread interrupted");
+    if (rc != ETIMEDOUT) INFO("overuse tracking thread interrupted");
     pthread_mutex_unlock(&overuse_trk_mutex);
 
     // synchronize all running kernels
@@ -428,7 +428,7 @@ void *wait_cuda_kernels(void *args) {
     cudaEventElapsedTime(&elapsed_ms, cuevent_start, event);
     overuse = std::max(0.0, (double)elapsed_ms - quota_time);
 
-    DEBUG("overuse: %.3f ms", overuse);
+    INFO("overuse: %.3f ms", overuse);
 
     // notify tracking complete
     pthread_mutex_lock(&overuse_trk_mutex);
@@ -508,7 +508,7 @@ CUresult cuLaunchCooperativeKernel_prehook(CUfunction f, unsigned int gridDimX,
 CUresult cuMemFree_prehook(CUdeviceptr ptr) {
   pthread_mutex_lock(&allocation_mutex);
   if (allocation_map.find(ptr) == allocation_map.end()) {
-    DEBUG("Freeing unknown memory! %zx", ptr);
+    INFO("Freeing unknown memory! %zx", ptr);
   } else {
     gpu_mem_used -= allocation_map[ptr];
     update_memory_usage(allocation_map[ptr], 0);

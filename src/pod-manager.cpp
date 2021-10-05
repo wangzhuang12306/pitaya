@@ -52,8 +52,8 @@ using std::chrono::time_point;
 using std::string;
 // connection information, below are default values
 // can be changed by environment vairables
-//char SCHEDULER_IP[20] = "127.0.0.1";
-char SCHEDULER_IP[20] = "219.245.186.38";
+char SCHEDULER_IP[20] = "127.0.0.1";
+//char SCHEDULER_IP[20] = "219.245.186.38";
 uint16_t SCHEDULER_PORT = 50051;
 uint16_t POD_SERVER_PORT = 50052;
 
@@ -310,7 +310,7 @@ int hook_update_memory_usage(size_t mem_size, int allocate, int sockfd) {
     gpu_mem_used -= mem_size;
     allocation_map[sockfd] -= mem_size;
   }
-  DEBUG("GPU memory usage = %ld bytes.", gpu_mem_used);
+  INFO("GPU memory usage = %ld bytes.", gpu_mem_used);
   pthread_mutex_unlock(&mem_info_mutex);
   return ok;
 }
@@ -324,7 +324,7 @@ double hook_kernel_launch(int sockfd, double overuse_ms, double burst) {
       pthread_mutex_unlock(&quota_state_mutex);
       break;
     } else {
-      DEBUG("wait for quota operation complete.");
+      INFO("wait for quota operation complete.");
       pthread_cond_wait(&quota_state_cond, &quota_state_mutex);
       pthread_mutex_unlock(&quota_state_mutex);
     }
@@ -403,7 +403,7 @@ double hook_kernel_launch(int sockfd, double overuse_ms, double burst) {
 
 // a thread interact with a hook library
 void *hook_thread_func(void *args) {
-  DEBUG("hook thread started.");
+  INFO("hook thread started.");
   int sockfd = *((int *)args);
   char rbuf[REQ_MSG_LEN], sbuf[RSP_MSG_LEN];
   ssize_t rc;
@@ -448,7 +448,7 @@ void *hook_thread_func(void *args) {
   pthread_mutex_lock(&mem_info_mutex);
   gpu_mem_used -= allocation_map[sockfd];
   allocation_map.erase(sockfd);
-  DEBUG("GPU memory usage = %ld bytes.", gpu_mem_used);
+  INFO("GPU memory usage = %ld bytes.", gpu_mem_used);
   pthread_mutex_unlock(&mem_info_mutex);
 
   pthread_mutex_lock(&client_stat_mutex);
@@ -476,7 +476,7 @@ void *scheduler_thread_send_func(void *args) {
       if ((send_rc = send(sockfd, req.data, REQ_MSG_LEN, 0)) <= 0) {
         ERROR("failed to send request to scheduler! return code %ld.", send_rc);
       } else {
-        DEBUG("send a kernel launch request, req_id: %d", req.req_id);
+        INFO("send a kernel launch request, req_id: %d", req.req_id);
       }
     }
     pthread_mutex_unlock(&req_queue_mutex);
@@ -499,7 +499,7 @@ void *scheduler_thread_recv_func(void *args) {
     attached = parse_response(buf, &req_id);
     rsp.data = new char[RSP_MSG_LEN - sizeof(reqid_t)];
     memcpy(rsp.data, attached, RSP_MSG_LEN - sizeof(reqid_t));
-    DEBUG("req_id %d complete.", req_id);
+    INFO("req_id %d complete.", req_id);
 
     // put response data into response_map and notify hook threads
     pthread_mutex_lock(&rsp_map_mutex);
